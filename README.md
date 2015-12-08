@@ -30,7 +30,7 @@ Function: fls64/63 (./arch/x86/include/asm/bitops.h:479:90)
 
 The tool can be easily used to display just a single function:
 
-'''
+```
 $ ./kgraft-ipa-analysis.py --symbol=scatterwalk_unmap aesni-intel_glue.i.000i.ipa-clones
 Function: scatterwalk_unmap/2930 (include/crypto/scatterwalk.h:81:60)
   isra: scatterwalk_unmap.isra.2/3142 (include/crypto/scatterwalk.h:81:60)
@@ -42,4 +42,4 @@ Function: scatterwalk_unmap/2930 (include/crypto/scatterwalk.h:81:60)
     scatterwalk_unmap.isra.2/3142 (include/crypto/scatterwalk.h:81:60)
     helper_rfc4106_decrypt/3007 (arch/x86/crypto/aesni-intel_glue.c:1016:12)
     helper_rfc4106_encrypt/3006 (arch/x86/crypto/aesni-intel_glue.c:939:12)
-'''
+```
