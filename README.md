@@ -2,8 +2,13 @@
 
 kgraft-analysis-tool is a simple tool capable of showing IPA cloning
 decisions made by modified version of the GCC compiler:
-
 https://github.com/marxin/gcc/tree/dump-ipa-clones
+
+Having a modifed function __foo__, the tool displays all functions that
+can be affected by a change applied to the function __foo__.
+The most common case is propagation via inlining, however there are
+another IPA passes (IPA split, IPA constant propagation, etc.)
+that can be eventually generate clones that are inlined to a function.
 
 ## Usages
 
