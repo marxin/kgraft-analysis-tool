@@ -7,36 +7,46 @@ import argparse
 
 from collections import OrderedDict
 
+parser = argparse.ArgumentParser(description='Display call graph transformations done by the GCC compiler.')
+parser.add_argument('file_list', metavar = 'FILE_LIST', help = 'File with list of callgraph dump files')
+parser.add_argument('--symbol', dest = 'symbol', help = 'Display optimizations just for the symbol')
+parser.add_argument('--group', dest = 'group', help = 'Group symbols by name, input source file, line and column', action='store_true')
+
+args = parser.parse_args()
+
 class Callgraph:
     def __init__(self):
         self.nodes = {}
+        self.nodes_by_name = {}
 
     def add(self, node):
-        key = node.name
+        key = node.get_key()
         if not key in self.nodes:
             self.nodes[key] = node
-        
+
+            if not node.name in self.nodes_by_name:
+                self.nodes_by_name[node.name] = []
+
+            self.nodes_by_name[node.name].append(node)
+
         return self.nodes[key]
 
-    def get(self, name):
-        if not name in self.nodes:
-            return None
-        return self.nodes[name]
+    def get_by_name(self, name):
+        if not name in self.nodes_by_name:
+            return []
+        else:
+            return self.nodes_by_name[name]
 
     def dump(self, symbol = None):
         items = None
         if symbol != None:
-            node = self.get(symbol)
-            if node == None:
-                print('Could not find symbol: %s' % symbol, file = sys.stderr)
-                return
-            else:
-                items = [node]
+            items = self.get_by_name(symbol)
         else:
             items = sorted(filter(lambda x: len(x.input_edges) > 0, self.nodes.values()), key = lambda x: x.name)
 
         for node in items:
-            print('Function: ' + str(node))
+            obj =  ' [object file: %s]' % node.object_file if not args.group else ''
+            print('Function: ' + str(node) + obj)
             affected = OrderedDict()
             node.dump(0, affected, set())
             print()
@@ -47,17 +57,28 @@ class Callgraph:
             print()
 
 class CallgraphNode:
-    def __init__(self, name, order, file, line, column):
+    def __init__(self, name, order, file, line, column, object_file):
         self.name = name
         self.order = int(order)
+        self.object_file = object_file
         self.file = file
         self.line = int(line)
         self.column = int(column)
         self.output_edges = []
         self.input_edges = []
 
+    def location(self):
+        return '%s:%d:%d' % (self.file, self.line, self.column)
+
     def __repr__(self):
-        return '%s/%s (%s:%d:%d)' % (self.name, self.order, self.file, self.line, self.column)
+        return '%s/%s (%s)' % (self.name, self.order, self.location())
+
+    def get_key(self):
+        key = self.name + ':' + self.location()
+        if not args.group:
+            key += ':' + self.object_file
+
+        return key
 
     def dump_input_edges (self):
         for e in self.input_edges:
@@ -100,31 +121,29 @@ def contains_symbol (f, symbol):
 
     return False
 
-parser = argparse.ArgumentParser(description='Display call graph transformations done by the GCC compiler.')
-parser.add_argument('files', metavar = 'FILES', help = 'Call graph dump file', nargs='+')
-parser.add_argument('--symbol', dest = 'symbol', help = 'Display optimizations just for the symbol')
+# read list of all files
+files = [x.strip() for x in open(args.file_list).readlines()]
 
-args = parser.parse_args()
+callgraph = Callgraph()
 
-for (i, f) in enumerate(args.files):
-    print('File (%d/%d): %s' % (i + 1, len(args.files), f))
+for (i, f) in enumerate(files):
+    print('Parsing file (%d/%d): %s' % (i + 1, len(files), f), file = sys.stderr)
 
     # Fast scan of the file
     if args.symbol != None and not contains_symbol (f, args.symbol):
         continue
 
-    callgraph = Callgraph()
     for line in open(f).readlines():
         line = line.strip()
         # format: Callgraph clone: pagefault_enable/1606 (include/linux/uaccess.h:35:60) <- helper_rfc4106_decrypt/3007 (location:arch/x86/crypto/aesni-intel_glue.c:1016:12) (optimization:inlining)
         m = re.match('Callgraph clone: (.*)/(.*) \((.*):(.*):(.*)\) <- (.*)/(.*) \(location:(.*):(.*):(.*)\) \(optimization:(.*)\)', line)
         if m != None:
-            original = CallgraphNode(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
+            original = CallgraphNode(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5), f)
             original = callgraph.add(original)
 
-            clone = CallgraphNode(m.group(6), m.group(7), m.group(8), m.group(9), m.group(10))
+            clone = CallgraphNode(m.group(6), m.group(7), m.group(8), m.group(9), m.group(10), f)
             clone = callgraph.add(clone)
 
             CallgraphEdge(original, clone, m.group(11))
 
-    callgraph.dump(args.symbol)
+callgraph.dump(args.symbol)
