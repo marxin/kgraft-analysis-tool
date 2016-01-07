@@ -152,8 +152,8 @@ for (i, f) in enumerate(files):
         line = line.strip()
         # format:
         #
-        # Callgraph clone;ovl_setattr.part.2;1346;fs/overlayfs/inode.c;15;5;<-;ovl_setattr;1284;;location:;fs/overlayfs/inode.c;15;5;optimization:;inlining to
-        # Callgraph removal;ovl_open_need_copy_up.isra.1;1345;fs/overlayfs/inode.c;293;13
+        # Callgraph removal;__ilog2_u64;159;include/linux/log2.h;40;5
+        # Callgraph clone;ovl_setxattr.part.3;1348;fs/overlayfs/inode.c;210;5;<-;ovl_setxattr;1291;fs/overlayfs/inode.c;210;5;optimization:;inlining to
         #
         tokens = line.split(';')
 
@@ -161,10 +161,10 @@ for (i, f) in enumerate(files):
             original = CallgraphNode(tokens[1], tokens[2], tokens[3], tokens[4], tokens[5], f)
             original = callgraph.add(original)
 
-            clone = CallgraphNode(tokens[7], tokens[8], tokens[11], tokens[12], tokens[13], f)
+            clone = CallgraphNode(tokens[7], tokens[8], tokens[9], tokens[10], tokens[11], f)
             clone = callgraph.add(clone)
 
-            CallgraphEdge(original, clone, tokens[15])
+            CallgraphEdge(original, clone, tokens[13])
         elif tokens[0] == 'Callgraph removal':
            callgraph.add_removed_node(tokens[1], tokens[3], tokens[4], tokens[5], f)
 
