@@ -18,6 +18,10 @@ class Callgraph:
     def __init__(self):
         self.nodes = {}
         self.nodes_by_name = {}
+        self.deleted_nodes = set()
+
+    def add_removed_node(self, name, file, line, column, object_file):
+        self.deleted_nodes.add(':'.join([name, file, line, column, object_file]))
 
     def add(self, node):
         key = node.get_key()
@@ -48,13 +52,18 @@ class Callgraph:
             obj =  ' [object file: %s]' % node.object_file if not args.group else ''
             print('Function: ' + str(node) + obj)
             affected = OrderedDict()
-            node.dump(0, affected, set())
+            node.dump(0, affected, set(), self)
             print()
             affected = list(affected)
             print('  Affected functions: %d' % len(affected))
             for a in affected:
                 print('    ' + str(a))
             print()
+
+    def mark_removed_nodes(self):
+        for node in self.nodes.values():
+            if node.get_key() in self.deleted_nodes:
+                node.is_removed = True
 
 class CallgraphNode:
     def __init__(self, name, order, file, line, column, object_file):
@@ -66,12 +75,17 @@ class CallgraphNode:
         self.column = int(column)
         self.output_edges = []
         self.input_edges = []
+        self.is_removed = False
 
     def location(self):
         return '%s:%d:%d' % (self.file, self.line, self.column)
 
     def __repr__(self):
-        return '%s/%s (%s)' % (self.name, self.order, self.location())
+        s = '%s/%s (%s)' % (self.name, self.order, self.location())
+        if self.is_removed:
+            s += ' [REMOVED]'
+
+        return s
 
     def get_key(self):
         key = self.name + ':' + self.location()
@@ -84,19 +98,20 @@ class CallgraphNode:
         for e in self.input_edges:
             print('  ' + str(e))
 
-    def print_indented(self, indentation, s):
-        print((' ' * indentation) + s)
+    def print_indented(self, indentation, s, end = '\n'):
+        print((' ' * indentation) + s, end = end)
 
-    def dump(self, indentation, affected, bt):
+    def dump(self, indentation, affected, bt, callgraph):
         indentation += 2
         for e in self.input_edges:
-            self.print_indented(indentation, '%s: %s' % (e.optimization, str(e.clone)))
+            self.print_indented(indentation, '%s: %s' % (e.optimization, str(e.clone)), end = '')
             if self in bt:
-                self.print_indented(indentation, 'Recursion function node')
+                print (' [RECURSIVE operation]')
             else:
+                print()
                 bt.add(self)
                 affected[e.clone] = None
-                e.clone.dump(indentation, affected, bt)
+                e.clone.dump(indentation, affected, bt, callgraph)
                 bt.remove(self)
 
 class CallgraphEdge:
@@ -113,7 +128,7 @@ class CallgraphEdge:
 
 def contains_symbol (f, symbol):
     contains = False
-    l = 'Callgraph clone: ' + symbol
+    l = 'Callgraph clone;' + symbol
 
     for line in open(f).readlines():
         if line.startswith(l):
@@ -135,15 +150,25 @@ for (i, f) in enumerate(files):
 
     for line in open(f).readlines():
         line = line.strip()
-        # format: Callgraph clone: pagefault_enable/1606 (include/linux/uaccess.h:35:60) <- helper_rfc4106_decrypt/3007 (location:arch/x86/crypto/aesni-intel_glue.c:1016:12) (optimization:inlining)
-        m = re.match('Callgraph clone: (.*)/(.*) \((.*):(.*):(.*)\) <- (.*)/(.*) \(location:(.*):(.*):(.*)\) \(optimization:(.*)\)', line)
-        if m != None:
-            original = CallgraphNode(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5), f)
+        # format:
+        #
+        # Callgraph clone;ovl_setattr.part.2;1346;fs/overlayfs/inode.c;15;5;<-;ovl_setattr;1284;;location:;fs/overlayfs/inode.c;15;5;optimization:;inlining to
+        # Callgraph removal;ovl_open_need_copy_up.isra.1;1345;fs/overlayfs/inode.c;293;13
+        #
+        tokens = line.split(';')
+
+        if tokens[0] == 'Callgraph clone':
+            original = CallgraphNode(tokens[1], tokens[2], tokens[3], tokens[4], tokens[5], f)
             original = callgraph.add(original)
 
-            clone = CallgraphNode(m.group(6), m.group(7), m.group(8), m.group(9), m.group(10), f)
+            clone = CallgraphNode(tokens[7], tokens[8], tokens[11], tokens[12], tokens[13], f)
             clone = callgraph.add(clone)
 
-            CallgraphEdge(original, clone, m.group(11))
+            CallgraphEdge(original, clone, tokens[15])
+        elif tokens[0] == 'Callgraph removal':
+           callgraph.add_removed_node(tokens[1], tokens[3], tokens[4], tokens[5], f)
+
+# mark removed nodes
+callgraph.mark_removed_nodes()
 
 callgraph.dump(args.symbol)
