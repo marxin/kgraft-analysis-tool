@@ -102,17 +102,17 @@ class CallgraphNode:
         print((' ' * indentation) + s, end = end)
 
     def dump(self, indentation, affected, bt, callgraph):
+        bt.add(self)
         indentation += 2
         for e in self.input_edges:
             self.print_indented(indentation, '%s: %s' % (e.optimization, str(e.clone)), end = '')
+            affected[e.clone] = None
             if self in bt:
                 print (' [RECURSIVE operation]')
             else:
                 print()
-                bt.add(self)
-                affected[e.clone] = None
                 e.clone.dump(indentation, affected, bt, callgraph)
-                bt.remove(self)
+        bt.remove(self)
 
 class CallgraphEdge:
     def __init__(self, original, clone, optimization):
