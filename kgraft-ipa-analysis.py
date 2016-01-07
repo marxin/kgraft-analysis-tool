@@ -29,7 +29,7 @@ class Callgraph:
             node = self.get(symbol)
             if node == None:
                 print('Could not find symbol: %s' % symbol, file = sys.stderr)
-                exit(3)
+                return
             else:
                 items = [node]
         else:
@@ -90,25 +90,41 @@ class CallgraphEdge:
     def __repr__(self):
         return '%s <- %s (%s)' % (self.original.name, str(self.clone), self.optimization)
 
+def contains_symbol (f, symbol):
+    contains = False
+    l = 'Callgraph clone: ' + symbol
+
+    for line in open(f).readlines():
+        if line.startswith(l):
+            return True
+
+    return False
+
 parser = argparse.ArgumentParser(description='Display call graph transformations done by the GCC compiler.')
-parser.add_argument('file', metavar = 'FILE', help = 'Call graph dump file')
+parser.add_argument('files', metavar = 'FILES', help = 'Call graph dump file', nargs='+')
 parser.add_argument('--symbol', dest = 'symbol', help = 'Display optimizations just for the symbol')
 
 args = parser.parse_args()
 
-callgraph = Callgraph()
+for (i, f) in enumerate(args.files):
+    print('File (%d/%d): %s' % (i + 1, len(args.files), f))
 
-for line in open(args.file).readlines():
-    line = line.strip()
-    # format: Callgraph clone: pagefault_enable/1606 (include/linux/uaccess.h:35:60) <- helper_rfc4106_decrypt/3007 (location:arch/x86/crypto/aesni-intel_glue.c:1016:12) (optimization:inlining)
-    m = re.match('Callgraph clone: (.*)/(.*) \((.*):(.*):(.*)\) <- (.*)/(.*) \(location:(.*):(.*):(.*)\) \(optimization:(.*)\)', line)
-    if m != None:
-        original = CallgraphNode(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
-        original = callgraph.add(original)
+    # Fast scan of the file
+    if args.symbol != None and not contains_symbol (f, args.symbol):
+        continue
 
-        clone = CallgraphNode(m.group(6), m.group(7), m.group(8), m.group(9), m.group(10))
-        clone = callgraph.add(clone)
+    callgraph = Callgraph()
+    for line in open(f).readlines():
+        line = line.strip()
+        # format: Callgraph clone: pagefault_enable/1606 (include/linux/uaccess.h:35:60) <- helper_rfc4106_decrypt/3007 (location:arch/x86/crypto/aesni-intel_glue.c:1016:12) (optimization:inlining)
+        m = re.match('Callgraph clone: (.*)/(.*) \((.*):(.*):(.*)\) <- (.*)/(.*) \(location:(.*):(.*):(.*)\) \(optimization:(.*)\)', line)
+        if m != None:
+            original = CallgraphNode(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
+            original = callgraph.add(original)
 
-        CallgraphEdge(original, clone, m.group(11))
+            clone = CallgraphNode(m.group(6), m.group(7), m.group(8), m.group(9), m.group(10))
+            clone = callgraph.add(clone)
 
-callgraph.dump(args.symbol)
+            CallgraphEdge(original, clone, m.group(11))
+
+    callgraph.dump(args.symbol)
