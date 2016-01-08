@@ -107,7 +107,7 @@ class CallgraphNode:
         for e in self.input_edges:
             self.print_indented(indentation, '%s: %s' % (e.optimization, str(e.clone)), end = '')
             affected[e.clone] = None
-            if self in bt:
+            if e.clone in bt:
                 print (' [RECURSIVE operation]')
             else:
                 print()
