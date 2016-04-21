@@ -108,9 +108,11 @@ class CallgraphNode:
             self.print_indented(indentation, '%s: %s' % (e.optimization, str(e.clone)), end = '')
             affected[e.clone] = None
             if e.clone in bt:
-                print (' [RECURSIVE operation]')
-            else:
-                print()
+                print (' [RECURSIVE operation]', end = '')
+            if e.count > 1:
+                print (' [edges: %d]' % e.count, end = '')
+            print()
+            if not e.clone in bt:
                 e.clone.dump(indentation, affected, bt, callgraph)
         bt.remove(self)
 
@@ -119,12 +121,24 @@ class CallgraphEdge:
         self.original = original
         self.clone = clone
         self.optimization = optimization
+        self.count = 1
 
-        self.original.input_edges.append(self)
-        self.clone.output_edges.append(self)
+        CallgraphEdge.add_edge_to_list(self.original.input_edges, self.clone.output_edges, self)
 
     def __repr__(self):
         return '%s <- %s (%s)' % (self.original.name, str(self.clone), self.optimization)
+
+    def __eq__(self, other):
+        return self.original == other.original and self.clone == other.clone
+
+    @staticmethod
+    def add_edge_to_list(l1, l2, edge):
+        try:
+            index = l1.index(edge)
+            l1[index].count += 1
+        except:
+            l1.append(edge)
+            l2.append(edge)
 
 def contains_symbol (f, symbol):
     contains = False
