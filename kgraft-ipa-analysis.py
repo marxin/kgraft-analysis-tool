@@ -142,7 +142,7 @@ class CallgraphEdge:
 
 def contains_symbol (f, symbol):
     contains = False
-    l = 'Callgraph clone;' + symbol
+    l = 'Callgraph clone;' + symbol + ';'
 
     for line in open(f).readlines():
         if line.startswith(l):
