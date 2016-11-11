@@ -11,6 +11,7 @@ parser = argparse.ArgumentParser(description='Display call graph transformations
 parser.add_argument('file_list', metavar = 'FILE_LIST', help = 'File with list of callgraph dump files')
 parser.add_argument('--symbol', dest = 'symbol', help = 'Display optimizations just for the symbol')
 parser.add_argument('--group', dest = 'group', help = 'Group symbols by name, input source file, line and column', action='store_true')
+parser.add_argument('--ignore-removed', dest = 'ignore_removed', help = 'Ignore removed symbols', action='store_true')
 
 args = parser.parse_args()
 
@@ -20,8 +21,8 @@ class Callgraph:
         self.nodes_by_name = {}
         self.deleted_nodes = set()
 
-    def add_removed_node(self, name, file, line, column, object_file):
-        self.deleted_nodes.add(':'.join([name, file, line, column, object_file]))
+    def add_removed_node(self, name, order, file, line, column, object_file):
+        self.deleted_nodes.add(':'.join([name, order, file, line, column, object_file]))
 
     def add(self, node):
         key = node.get_key()
@@ -49,6 +50,8 @@ class Callgraph:
             items = sorted(filter(lambda x: len(x.input_edges) > 0, self.nodes.values()), key = lambda x: x.name)
 
         for node in items:
+            if args.ignore_removed and node.is_removed:
+                continue
             obj =  ' [object file: %s]' % node.object_file if not args.group else ''
             print('Function: ' + str(node) + obj)
             affected = OrderedDict()
@@ -88,7 +91,7 @@ class CallgraphNode:
         return s
 
     def get_key(self):
-        key = self.name + ':' + self.location()
+        key = ':'.join([self.name, str(self.order), self.location()])
         if not args.group:
             key += ':' + self.object_file
 
@@ -180,7 +183,7 @@ for (i, f) in enumerate(files):
 
             CallgraphEdge(original, clone, tokens[13])
         elif tokens[0] == 'Callgraph removal':
-           callgraph.add_removed_node(tokens[1], tokens[3], tokens[4], tokens[5], f)
+           callgraph.add_removed_node(tokens[1], tokens[2], tokens[3], tokens[4], tokens[5], f)
 
 # mark removed nodes
 callgraph.mark_removed_nodes()
