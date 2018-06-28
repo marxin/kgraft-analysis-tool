@@ -172,16 +172,25 @@ for (i, f) in enumerate(files):
         # Callgraph removal;__ilog2_u64;159;include/linux/log2.h;40;5
         # Callgraph clone;ovl_setxattr.part.3;1348;fs/overlayfs/inode.c;210;5;<-;ovl_setxattr;1291;fs/overlayfs/inode.c;210;5;optimization:;inlining to
         #
+        # new format (GCC 7.1+):
+        # Callgraph clone;fls64;28;../arch/x86/include/asm/bitops.h;492;28;__ilog2_u64;100;../include/linux/log2.h;34;5;inlining to
+        #
         tokens = line.split(';')
 
         if tokens[0] == 'Callgraph clone':
             original = CallgraphNode(tokens[1], tokens[2], tokens[3], tokens[4], tokens[5], f)
             original = callgraph.add(original)
 
-            clone = CallgraphNode(tokens[7], tokens[8], tokens[9], tokens[10], tokens[11], f)
+            # shift tokens
+            tokens = tokens[6:]
+            if tokens[0] == '<-':
+                tokens = tokens[1:]
+            assert len(tokens) == 6
+
+            clone = CallgraphNode(tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], f)
             clone = callgraph.add(clone)
 
-            CallgraphEdge(original, clone, tokens[13])
+            CallgraphEdge(original, clone, tokens[5])
         elif tokens[0] == 'Callgraph removal':
            callgraph.add_removed_node(tokens[1], tokens[2], tokens[3], tokens[4], tokens[5], f)
 
