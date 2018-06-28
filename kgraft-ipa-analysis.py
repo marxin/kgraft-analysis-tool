@@ -185,12 +185,12 @@ for (i, f) in enumerate(files):
             tokens = tokens[6:]
             if tokens[0] == '<-':
                 tokens = tokens[1:]
-            assert len(tokens) == 6
+                assert tokens[-2] == 'optimization:'
 
             clone = CallgraphNode(tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], f)
             clone = callgraph.add(clone)
 
-            CallgraphEdge(original, clone, tokens[5])
+            CallgraphEdge(original, clone, tokens[-1])
         elif tokens[0] == 'Callgraph removal':
            callgraph.add_removed_node(tokens[1], tokens[2], tokens[3], tokens[4], tokens[5], f)
 
